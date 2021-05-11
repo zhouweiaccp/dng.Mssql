@@ -7,7 +7,19 @@ using System.Threading.Tasks;
 
 namespace System.Data.SqlClient {
 
-	public class SqlConnectionPool : ObjectPool<SqlConnection> {
+	/// <summary>
+	/// var pool = new System.Data.SqlClient.SqlConnectionPool("名称", connectionString, 可用时触发的委托, 不可用时触发的委托);
+//	var conn = pool.Get();
+
+//try {
+//	// 使用 ...
+//	pool.Return(conn); //正常归还
+//} catch (Exception ex)
+//{
+//	pool.Return(conn, ex); //发生错误时归还
+//}
+/// </summary>
+public class SqlConnectionPool : ObjectPool<SqlConnection> {
 
 		internal Action availableHandler;
 		internal Action unavailableHandler;
@@ -36,18 +48,24 @@ namespace System.Data.SqlClient {
 		}
 	}
 
-	public class SqlConnectionPoolPolicy : IPolicy<SqlConnection> {
+	public class SqlConnectionPoolPolicy : DefaultPolicy<SqlConnection> {
 
 		internal SqlConnectionPool _pool;
-		public string Name { get; set; } = "SQLServer SqlConnection 对象池";
-		public int PoolSize { get; set; } = 100;
-		public TimeSpan SyncGetTimeout { get; set; } = TimeSpan.FromSeconds(10);
-		public TimeSpan IdleTimeout { get; set; } = TimeSpan.Zero;
-		public int AsyncGetCapacity { get; set; } = 10000;
-		public bool IsThrowGetTimeoutException { get; set; } = true;
-		public int CheckAvailableInterval { get; set; } = 5;
+		public  override string Name { get; set; } = "SQLServer SqlConnection 对象池";
+		public override int PoolSize { get; set; } = 100;
+		public override TimeSpan SyncGetTimeout { get; set; } = TimeSpan.FromSeconds(10);
+		public override TimeSpan IdleTimeout { get; set; } = TimeSpan.Zero;
+		public override int AsyncGetCapacity { get; set; } = 10000;
+		public override bool IsThrowGetTimeoutException { get; set; } = true;
+		/// <summary>
+		/// 5秒
+		/// </summary>
+		public override int CheckAvailableInterval { get; set; } = 5;
 
 		private string _connectionString;
+		/// <summary>
+		/// Server=192.168.253.125;Database=EDoc;uid=sa;pwd=1qaz2WSX;Min Pool Size=10;Max Pool Size=100;Pooling=True
+		/// </summary>
 		public string ConnectionString {
 			get => _connectionString;
 			set {
@@ -62,8 +80,15 @@ namespace System.Data.SqlClient {
 			}
 		}
 
+        //public int PoolReleaseInterval { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+        //public int PoolMinSize { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
-		public bool OnCheckAvailable(Object<SqlConnection> obj) {
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="obj"></param>
+		/// <returns></returns>
+        public override bool OnCheckAvailable(Object<SqlConnection> obj) {
 			if (obj.Value.State == ConnectionState.Closed) obj.Value.Open();
 			var cmd = obj.Value.CreateCommand();
 			cmd.CommandText = "select 1";
@@ -71,17 +96,21 @@ namespace System.Data.SqlClient {
 			return true;
 		}
 
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <returns></returns>
 		public SqlConnection OnCreate() {
 			var conn = new SqlConnection(_connectionString);
 			return conn;
 		}
 
-		public void OnDestroy(SqlConnection obj) {
+		public  override void OnDestroy(SqlConnection obj) {
 			if (obj.State != ConnectionState.Closed) obj.Close();
 			obj.Dispose();
 		}
 
-		public void OnGet(Object<SqlConnection> obj) {
+		public override void OnGet(Object<SqlConnection> obj) {
 
 			if (_pool.IsAvailable) {
 
@@ -97,35 +126,35 @@ namespace System.Data.SqlClient {
 			}
 		}
 
-		async public Task OnGetAsync(Object<SqlConnection> obj) {
+		//async public Task OnGetAsync(Object<SqlConnection> obj) {
 
-			if (_pool.IsAvailable) {
+		//	if (_pool.IsAvailable) {
 
-				if (obj.Value.State != ConnectionState.Open || DateTime.Now.Subtract(obj.LastReturnTime).TotalSeconds > 60 && obj.Value.Ping() == false) {
+		//		if (obj.Value.State != ConnectionState.Open || DateTime.Now.Subtract(obj.LastReturnTime).TotalSeconds > 60 && obj.Value.Ping() == false) {
 
-					try {
-						await obj.Value.OpenAsync();
-					} catch (Exception ex) {
-						if (_pool.SetUnavailable(ex) == true)
-							throw new Exception($"【{this.Name}】状态不可用，等待后台检查程序恢复方可使用。{ex.Message}");
-					}
-				}
-			}
-		}
+		//			try {
+		//				await obj.Value.OpenAsync();
+		//			} catch (Exception ex) {
+		//				if (_pool.SetUnavailable(ex) == true)
+		//					throw new Exception($"【{this.Name}】状态不可用，等待后台检查程序恢复方可使用。{ex.Message}");
+		//			}
+		//		}
+		//	}
+		//}
 
-		public void OnGetTimeout() {
+		//public void OnGetTimeout() {
 
-		}
+		//}
 
-		public void OnReturn(Object<SqlConnection> obj) {
+		public override void OnReturn(Object<SqlConnection> obj) {
 			if (obj.Value.State != ConnectionState.Closed) try { obj.Value.Close(); } catch { }
 		}
 
-		public void OnAvailable() {
+		public override void OnAvailable() {
 			_pool.availableHandler?.Invoke();
 		}
 
-		public void OnUnavailable() {
+		public override void OnUnavailable() {
 			_pool.unavailableHandler?.Invoke();
 		}
 	}
