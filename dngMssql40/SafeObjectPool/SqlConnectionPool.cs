@@ -100,12 +100,13 @@ public class SqlConnectionPool : ObjectPool<SqlConnection> {
 		/// 
 		/// </summary>
 		/// <returns></returns>
-		public SqlConnection OnCreate() {
+		public virtual SqlConnection OnCreate() {
 			var conn = new SqlConnection(_connectionString);
 			return conn;
 		}
 
 		public  override void OnDestroy(SqlConnection obj) {
+			if(obj==null){return;}
 			if (obj.State != ConnectionState.Closed) obj.Close();
 			obj.Dispose();
 		}

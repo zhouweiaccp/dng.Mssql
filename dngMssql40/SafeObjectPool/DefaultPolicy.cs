@@ -15,7 +15,7 @@ namespace SafeObjectPool
         /// <summary>
         /// 定时释放30分钟
         /// </summary>
-        public int PoolReleaseInterval { get; set; } = 30;
+        public virtual int PoolReleaseInterval { get; set; } = 30;
         /// <summary>
         /// 最少连接池5个
         /// </summary>
@@ -30,7 +30,7 @@ namespace SafeObjectPool
         public Func<T> CreateObject;
         public Action<Object<T>> OnGetObject;
 
-        public  T OnCreate()
+        public virtual T OnCreate()
         {
             return CreateObject();
         }
